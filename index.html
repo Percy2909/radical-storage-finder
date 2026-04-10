@@ -186,6 +186,8 @@
                         <p>🔗 <a href="https://foursquare.com/developers/signup" target="_blank" style="color: #6c5ce7;">Obtener Foursquare API Key</a> (gratis, 10k calls/mes)</p>
                         <p>🔗 <a href="https://besttime.app/api/v1/keys/pub" target="_blank" style="color: #6c5ce7;">Obtener BestTime API Key</a> (gratis, 100 créditos)</p>
                     </div>
+                    <button class="btn btn-sm btn-outline" style="margin-top:10px;width:100%" onclick="testFoursquareApi()">🧪 Test API Connection</button>
+                    <div id="apiDebugOutput" style="display:none;margin-top:10px;background:#0d0f15;border:1px solid #2d3148;border-radius:6px;padding:10px;font-family:monospace;font-size:11px;color:#8b8fa3;max-height:200px;overflow-y:auto;word-break:break-all;white-space:pre-wrap;"></div>
                 </div>
             </div>
 
@@ -254,12 +256,12 @@
             const btStatus = document.getElementById('btStatus');
             const banner = document.getElementById('demoBanner');
 
-            if (fsqKey.startsWith('fsq')) {
-                fsqStatus.innerHTML = '● Conectado';
+            if (fsqKey.length > 10) {
+                fsqStatus.innerHTML = '● Key entered — use "Test API" to verify';
                 fsqStatus.className = 'api-status connected';
                 banner.style.display = 'none';
             } else if (fsqKey) {
-                fsqStatus.innerHTML = '● Verificando...';
+                fsqStatus.innerHTML = '● Key too short...';
                 fsqStatus.className = 'api-status demo';
             } else {
                 fsqStatus.innerHTML = '';
@@ -275,7 +277,72 @@
         }
 
         function isUsingRealApi() {
-            return document.getElementById('fsqApiKey').value.startsWith('fsq');
+            const key = document.getElementById('fsqApiKey').value.trim();
+            return key.length > 10; // Accept any key format
+        }
+
+        async function testFoursquareApi() {
+            const debug = document.getElementById('apiDebugOutput');
+            debug.style.display = 'block';
+            const apiKey = document.getElementById('fsqApiKey').value.trim();
+
+            if (!apiKey) {
+                debug.innerHTML = '<span style="color:#e74c3c">❌ No API key entered. Paste your key above first.</span>';
+                return;
+            }
+
+            debug.innerHTML = '⏳ Testing connection to Foursquare...\n\n';
+
+            // Test with a well-known location: Roma Termini
+            const testLat = 41.9010;
+            const testLon = 12.5024;
+
+            // Try different auth header formats
+            const authFormats = [
+                { name: 'Key only', header: apiKey },
+                { name: 'Bearer token', header: `Bearer ${apiKey}` },
+            ];
+
+            for (const fmt of authFormats) {
+                debug.innerHTML += `\n🔑 Trying auth format: "${fmt.name}"...\n`;
+                try {
+                    const url = `https://api.foursquare.com/v3/places/search?ll=${testLat},${testLon}&radius=500&categories=19000&limit=5`;
+                    debug.innerHTML += `📡 URL: ${url}\n`;
+
+                    const response = await fetch(url, {
+                        headers: { 'Authorization': fmt.header, 'Accept': 'application/json' }
+                    });
+
+                    debug.innerHTML += `📬 Status: ${response.status} ${response.statusText}\n`;
+
+                    const text = await response.text();
+                    let data;
+                    try { data = JSON.parse(text); } catch { data = null; }
+
+                    if (response.ok && data?.results) {
+                        debug.innerHTML += `<span style="color:#2ecc71">✅ SUCCESS! Got ${data.results.length} results near Roma Termini</span>\n`;
+                        if (data.results.length > 0) {
+                            debug.innerHTML += `\n📍 Sample results:\n`;
+                            data.results.slice(0, 3).forEach((r, i) => {
+                                debug.innerHTML += `  ${i+1}. "${r.name}" — ${r.distance}m — cats: ${(r.categories||[]).map(c=>c.name).join(', ')}\n`;
+                                debug.innerHTML += `     coords: ${r.geocodes?.main?.latitude}, ${r.geocodes?.main?.longitude}\n`;
+                            });
+                        }
+                        debug.innerHTML += `\n<span style="color:#2ecc71">🎉 Your API key works with "${fmt.name}" format!</span>\n`;
+
+                        // Store which format works
+                        window._fsqAuthFormat = fmt.name;
+                        return;
+                    } else {
+                        debug.innerHTML += `<span style="color:#f39c12">⚠️ Response body:\n${text.substring(0, 300)}</span>\n`;
+                    }
+                } catch (err) {
+                    debug.innerHTML += `<span style="color:#e74c3c">❌ Network error: ${err.message}</span>\n`;
+                }
+            }
+
+            debug.innerHTML += `\n<span style="color:#e74c3c">❌ No auth format worked. Check your key or Foursquare account status.</span>\n`;
+            debug.innerHTML += `\nTips:\n- Make sure you copied the FULL key\n- Check your Foursquare Developer dashboard for key status\n- Free tier allows 10,000 calls/month`;
         }
 
         // ============================================
@@ -643,22 +710,31 @@
         // FOURSQUARE API
         // ============================================
         async function fetchFoursquareCategory(lat, lon, categories) {
-            const apiKey = document.getElementById('fsqApiKey').value;
+            const apiKey = document.getElementById('fsqApiKey').value.trim();
+            // Use whichever auth format the test found working, default to key only
+            const authHeader = window._fsqAuthFormat === 'Bearer token' ? `Bearer ${apiKey}` : apiKey;
             const url = `https://api.foursquare.com/v3/places/search?ll=${lat},${lon}&radius=1000&categories=${categories}&limit=50&sort=DISTANCE`;
-            console.log('[FSQ] Fetching:', url);
+            console.log('[FSQ] Fetching:', categories, 'at', lat, lon);
             try {
                 const response = await fetch(url, {
-                    headers: { 'Authorization': apiKey, 'Accept': 'application/json' }
+                    headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
                 });
                 if (!response.ok) {
                     const errText = await response.text();
                     console.error('[FSQ] API error', response.status, errText);
+                    // Show error visually
+                    const debug = document.getElementById('apiDebugOutput');
+                    if (debug) {
+                        debug.style.display = 'block';
+                        debug.innerHTML += `<span style="color:#e74c3c">❌ API ${response.status}: ${errText.substring(0,200)}</span>\n`;
+                    }
                     return [];
                 }
                 const data = await response.json();
-                console.log('[FSQ] Categories', categories, '→', data.results?.length || 0, 'results');
+                const results = data.results || [];
+                console.log('[FSQ] Categories', categories, '→', results.length, 'results');
                 // Normalize Foursquare v3 response to our internal format
-                return (data.results || []).map(place => ({
+                return results.map(place => ({
                     name: place.name || 'Unknown',
                     distance: place.distance || 999,
                     lat: place.geocodes?.main?.latitude || null,
@@ -669,6 +745,11 @@
                 }));
             } catch (err) {
                 console.error('[FSQ] Fetch failed:', err);
+                const debug = document.getElementById('apiDebugOutput');
+                if (debug) {
+                    debug.style.display = 'block';
+                    debug.innerHTML += `<span style="color:#e74c3c">❌ Network error: ${err.message}</span>\n`;
+                }
                 return [];
             }
         }
