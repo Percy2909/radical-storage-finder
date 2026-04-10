@@ -167,32 +167,10 @@
             </div>
 
             <div class="api-section">
-                <div class="api-toggle" onclick="toggleApiConfig()">
-                    <h3>⚙️ Configuración API</h3>
-                    <span class="arrow" id="apiArrow">▼</span>
+                <div style="display:flex;align-items:center;gap:8px;padding:2px 0;">
+                    <div style="width:8px;height:8px;border-radius:50%;background:#2ecc71;flex-shrink:0;"></div>
+                    <span style="font-size:12px;color:#8b8fa3;">Datos en tiempo real via <strong style="color:#2ecc71">OpenStreetMap Overpass API</strong> — gratis, sin API key</span>
                 </div>
-                <div class="api-fields" id="apiFields">
-                    <div class="api-field">
-                        <label>Foursquare API Key</label>
-                        <input type="password" id="fsqApiKey" placeholder="fsq3..." oninput="checkApiStatus()" />
-                        <div class="api-status" id="fsqStatus"></div>
-                    </div>
-                    <div class="api-field">
-                        <label>BestTime API Key (Opcional)</label>
-                        <input type="password" id="btApiKey" placeholder="pri_..." oninput="checkApiStatus()" />
-                        <div class="api-status" id="btStatus"></div>
-                    </div>
-                    <div style="margin-top: 12px; font-size: 11px; color: #555a70; line-height: 1.5;">
-                        <p>🔗 <a href="https://foursquare.com/developers/signup" target="_blank" style="color: #6c5ce7;">Obtener Foursquare API Key</a> (gratis, 10k calls/mes)</p>
-                        <p>🔗 <a href="https://besttime.app/api/v1/keys/pub" target="_blank" style="color: #6c5ce7;">Obtener BestTime API Key</a> (gratis, 100 créditos)</p>
-                    </div>
-                    <button class="btn btn-sm btn-outline" style="margin-top:10px;width:100%" onclick="testFoursquareApi()">🧪 Test API Connection</button>
-                    <div id="apiDebugOutput" style="display:none;margin-top:10px;background:#0d0f15;border:1px solid #2d3148;border-radius:6px;padding:10px;font-family:monospace;font-size:11px;color:#8b8fa3;max-height:200px;overflow-y:auto;word-break:break-all;white-space:pre-wrap;"></div>
-                </div>
-            </div>
-
-            <div id="demoBanner" class="demo-banner">
-                <strong>🎮 Modo Demo activo</strong> — Se usan datos simulados. Añade tu Foursquare API Key para datos reales.
             </div>
 
             <div class="results-section" id="resultsSection">
@@ -242,108 +220,7 @@
         // ============================================
         // API CONFIGURATION
         // ============================================
-        function toggleApiConfig() {
-            const fields = document.getElementById('apiFields');
-            const arrow = document.getElementById('apiArrow');
-            fields.classList.toggle('open');
-            arrow.classList.toggle('open');
-        }
-
-        function checkApiStatus() {
-            const fsqKey = document.getElementById('fsqApiKey').value;
-            const btKey = document.getElementById('btApiKey').value;
-            const fsqStatus = document.getElementById('fsqStatus');
-            const btStatus = document.getElementById('btStatus');
-            const banner = document.getElementById('demoBanner');
-
-            if (fsqKey.length > 10) {
-                fsqStatus.innerHTML = '● Key entered — use "Test API" to verify';
-                fsqStatus.className = 'api-status connected';
-                banner.style.display = 'none';
-            } else if (fsqKey) {
-                fsqStatus.innerHTML = '● Key too short...';
-                fsqStatus.className = 'api-status demo';
-            } else {
-                fsqStatus.innerHTML = '';
-                banner.style.display = 'block';
-            }
-
-            if (btKey.startsWith('pri_')) {
-                btStatus.innerHTML = '● Conectado';
-                btStatus.className = 'api-status connected';
-            } else {
-                btStatus.innerHTML = '';
-            }
-        }
-
-        function isUsingRealApi() {
-            const key = document.getElementById('fsqApiKey').value.trim();
-            return key.length > 10; // Accept any key format
-        }
-
-        async function testFoursquareApi() {
-            const debug = document.getElementById('apiDebugOutput');
-            debug.style.display = 'block';
-            const apiKey = document.getElementById('fsqApiKey').value.trim();
-
-            if (!apiKey) {
-                debug.innerHTML = '<span style="color:#e74c3c">❌ No API key entered. Paste your key above first.</span>';
-                return;
-            }
-
-            debug.innerHTML = '⏳ Testing connection to Foursquare...\n\n';
-
-            // Test with a well-known location: Roma Termini
-            const testLat = 41.9010;
-            const testLon = 12.5024;
-
-            // Try different auth header formats
-            const authFormats = [
-                { name: 'Key only', header: apiKey },
-                { name: 'Bearer token', header: `Bearer ${apiKey}` },
-            ];
-
-            for (const fmt of authFormats) {
-                debug.innerHTML += `\n🔑 Trying auth format: "${fmt.name}"...\n`;
-                try {
-                    const url = `https://api.foursquare.com/v3/places/search?ll=${testLat},${testLon}&radius=500&categories=19000&limit=5`;
-                    debug.innerHTML += `📡 URL: ${url}\n`;
-
-                    const response = await fetch(url, {
-                        headers: { 'Authorization': fmt.header, 'Accept': 'application/json' }
-                    });
-
-                    debug.innerHTML += `📬 Status: ${response.status} ${response.statusText}\n`;
-
-                    const text = await response.text();
-                    let data;
-                    try { data = JSON.parse(text); } catch { data = null; }
-
-                    if (response.ok && data?.results) {
-                        debug.innerHTML += `<span style="color:#2ecc71">✅ SUCCESS! Got ${data.results.length} results near Roma Termini</span>\n`;
-                        if (data.results.length > 0) {
-                            debug.innerHTML += `\n📍 Sample results:\n`;
-                            data.results.slice(0, 3).forEach((r, i) => {
-                                debug.innerHTML += `  ${i+1}. "${r.name}" — ${r.distance}m — cats: ${(r.categories||[]).map(c=>c.name).join(', ')}\n`;
-                                debug.innerHTML += `     coords: ${r.geocodes?.main?.latitude}, ${r.geocodes?.main?.longitude}\n`;
-                            });
-                        }
-                        debug.innerHTML += `\n<span style="color:#2ecc71">🎉 Your API key works with "${fmt.name}" format!</span>\n`;
-
-                        // Store which format works
-                        window._fsqAuthFormat = fmt.name;
-                        return;
-                    } else {
-                        debug.innerHTML += `<span style="color:#f39c12">⚠️ Response body:\n${text.substring(0, 300)}</span>\n`;
-                    }
-                } catch (err) {
-                    debug.innerHTML += `<span style="color:#e74c3c">❌ Network error: ${err.message}</span>\n`;
-                }
-            }
-
-            debug.innerHTML += `\n<span style="color:#e74c3c">❌ No auth format worked. Check your key or Foursquare account status.</span>\n`;
-            debug.innerHTML += `\nTips:\n- Make sure you copied the FULL key\n- Check your Foursquare Developer dashboard for key status\n- Free tier allows 10,000 calls/month`;
-        }
+        // No API config needed — using free OpenStreetMap Overpass API
 
         // ============================================
         // SEARCH & GEOCODING (Nominatim - free)
@@ -664,13 +541,16 @@
 
             let transportData, tourismData, trafficData;
 
-            if (isUsingRealApi()) {
+            // Try Overpass API (OpenStreetMap) — free, no key needed
+            try {
                 [transportData, tourismData, trafficData] = await Promise.all([
-                    fetchFoursquareCategory(lat, lon, '19000'),  // Travel & Transportation (stations, airports, etc.)
-                    fetchFoursquareCategory(lat, lon, '16000'),  // Landmarks & Outdoors (monuments, parks, plazas)
-                    fetchFoursquareCategory(lat, lon, '13000')   // Dining & Drinking (proxy for foot traffic density)
+                    fetchOverpass(lat, lon, 'transport'),
+                    fetchOverpass(lat, lon, 'tourism'),
+                    fetchOverpass(lat, lon, 'traffic')
                 ]);
-            } else {
+                console.log('[OSM] Results:', transportData.length, 'transport,', tourismData.length, 'tourism,', trafficData.length, 'traffic');
+            } catch (err) {
+                console.warn('[OSM] Overpass failed, using demo data:', err);
                 [transportData, tourismData, trafficData] = generateDemoData(lat, lon);
             }
 
@@ -679,7 +559,6 @@
             const trafficScore = calculateCategoryScore(trafficData);
             const totalScore = Math.round(transportScore * 0.35 + tourismScore * 0.35 + trafficScore * 0.30);
 
-            // Estimate avg. transit per minute based on scores & location type
             const transitPerMin = estimateTransitPerMin(lat, lon, transportScore, tourismScore, trafficScore, transportData);
 
             const shortName = name.split(',').slice(0, 2).join(',');
@@ -707,51 +586,103 @@
         }
 
         // ============================================
-        // FOURSQUARE API
+        // OVERPASS API (OpenStreetMap) — FREE, NO KEY
         // ============================================
-        async function fetchFoursquareCategory(lat, lon, categories) {
-            const apiKey = document.getElementById('fsqApiKey').value.trim();
-            // Use whichever auth format the test found working, default to key only
-            const authHeader = window._fsqAuthFormat === 'Bearer token' ? `Bearer ${apiKey}` : apiKey;
-            const url = `https://api.foursquare.com/v3/places/search?ll=${lat},${lon}&radius=1000&categories=${categories}&limit=50&sort=DISTANCE`;
-            console.log('[FSQ] Fetching:', categories, 'at', lat, lon);
-            try {
-                const response = await fetch(url, {
-                    headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
-                });
-                if (!response.ok) {
-                    const errText = await response.text();
-                    console.error('[FSQ] API error', response.status, errText);
-                    // Show error visually
-                    const debug = document.getElementById('apiDebugOutput');
-                    if (debug) {
-                        debug.style.display = 'block';
-                        debug.innerHTML += `<span style="color:#e74c3c">❌ API ${response.status}: ${errText.substring(0,200)}</span>\n`;
-                    }
-                    return [];
-                }
-                const data = await response.json();
-                const results = data.results || [];
-                console.log('[FSQ] Categories', categories, '→', results.length, 'results');
-                // Normalize Foursquare v3 response to our internal format
-                return results.map(place => ({
-                    name: place.name || 'Unknown',
-                    distance: place.distance || 999,
-                    lat: place.geocodes?.main?.latitude || null,
-                    lon: place.geocodes?.main?.longitude || null,
-                    popularity: place.popularity || 0,
-                    rating: place.rating || 0,
-                    category: place.categories?.[0]?.name || ''
-                }));
-            } catch (err) {
-                console.error('[FSQ] Fetch failed:', err);
-                const debug = document.getElementById('apiDebugOutput');
-                if (debug) {
-                    debug.style.display = 'block';
-                    debug.innerHTML += `<span style="color:#e74c3c">❌ Network error: ${err.message}</span>\n`;
-                }
-                return [];
+        async function fetchOverpass(lat, lon, type) {
+            // Build Overpass QL query for 1km radius
+            const radius = 1000;
+            let filters = '';
+
+            if (type === 'transport') {
+                // Train stations, metro, bus stops, tram, ferry
+                filters = `
+                    node["railway"="station"](around:${radius},${lat},${lon});
+                    node["railway"="halt"](around:${radius},${lat},${lon});
+                    node["station"="subway"](around:${radius},${lat},${lon});
+                    node["public_transport"="station"](around:${radius},${lat},${lon});
+                    node["public_transport"="stop_position"]["bus"="yes"](around:${radius},${lat},${lon});
+                    node["amenity"="bus_station"](around:${radius},${lat},${lon});
+                    node["highway"="bus_stop"](around:${radius},${lat},${lon});
+                    node["railway"="tram_stop"](around:${radius},${lat},${lon});
+                    node["amenity"="ferry_terminal"](around:${radius},${lat},${lon});
+                    node["amenity"="taxi"](around:${radius},${lat},${lon});
+                `;
+            } else if (type === 'tourism') {
+                // Museums, monuments, attractions, historic sites, viewpoints
+                filters = `
+                    node["tourism"="museum"](around:${radius},${lat},${lon});
+                    node["tourism"="attraction"](around:${radius},${lat},${lon});
+                    node["tourism"="gallery"](around:${radius},${lat},${lon});
+                    node["tourism"="viewpoint"](around:${radius},${lat},${lon});
+                    node["historic"](around:${radius},${lat},${lon});
+                    node["tourism"="artwork"](around:${radius},${lat},${lon});
+                    way["tourism"="museum"](around:${radius},${lat},${lon});
+                    way["tourism"="attraction"](around:${radius},${lat},${lon});
+                    way["historic"](around:${radius},${lat},${lon});
+                    node["amenity"="theatre"](around:${radius},${lat},${lon});
+                    node["amenity"="place_of_worship"](around:${radius},${lat},${lon});
+                `;
+            } else { // traffic — dining & retail as proxy for foot traffic
+                filters = `
+                    node["amenity"="restaurant"](around:${radius},${lat},${lon});
+                    node["amenity"="cafe"](around:${radius},${lat},${lon});
+                    node["amenity"="bar"](around:${radius},${lat},${lon});
+                    node["amenity"="fast_food"](around:${radius},${lat},${lon});
+                    node["shop"](around:${radius},${lat},${lon});
+                    node["tourism"="hotel"](around:${radius},${lat},${lon});
+                    node["tourism"="hostel"](around:${radius},${lat},${lon});
+                `;
             }
+
+            const query = `[out:json][timeout:15];(${filters});out center body 50;`;
+
+            // Try main server, then mirror
+            const servers = [
+                'https://overpass-api.de/api/interpreter',
+                'https://overpass.kumi.systems/api/interpreter'
+            ];
+
+            console.log(`[OSM] Querying ${type} near ${lat},${lon}...`);
+
+            let data = null;
+            for (const url of servers) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'data=' + encodeURIComponent(query)
+                    });
+                    if (response.ok) {
+                        data = await response.json();
+                        console.log(`[OSM] Success via ${url}`);
+                        break;
+                    }
+                    console.warn(`[OSM] ${url} returned ${response.status}, trying next...`);
+                } catch (err) {
+                    console.warn(`[OSM] ${url} failed: ${err.message}, trying next...`);
+                }
+            }
+
+            if (!data) throw new Error('All Overpass servers failed');
+            const elements = data.elements || [];
+
+            // Normalize to our internal format
+            return elements.map(el => {
+                const elLat = el.lat || el.center?.lat || lat;
+                const elLon = el.lon || el.center?.lon || lon;
+                const dist = haversine(lat, lon, elLat, elLon) * 1000; // km to meters
+                const name = el.tags?.name || el.tags?.operator || el.tags?.amenity || el.tags?.shop || el.tags?.tourism || el.tags?.historic || 'POI';
+                const cat = el.tags?.amenity || el.tags?.shop || el.tags?.tourism || el.tags?.railway || el.tags?.public_transport || el.tags?.historic || '';
+                return {
+                    name: name,
+                    distance: Math.round(dist),
+                    lat: elLat,
+                    lon: elLon,
+                    popularity: 0,
+                    rating: 0,
+                    category: cat
+                };
+            }).sort((a, b) => a.distance - b.distance);
         }
 
         // ============================================
